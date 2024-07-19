@@ -1,0 +1,53 @@
+// src/pages/Posta.jsx
+import React, { useState } from 'react';
+import { db, storage, auth } from '../firebase-config';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { collection, addDoc } from 'firebase/firestore';
+import { useNavigate } from 'react-router-dom';
+import { useAuthState } from 'react-firebase-hooks/auth';
+
+const Posta = () => {
+    const [title, setTitle] = useState('');
+    const [description, setDescription] = useState('');
+    const [location, setLocation] = useState('');
+    const [images, setImages] = useState([]);
+    const [user] = useAuthState(auth);
+    const navigate = useNavigate();
+
+    const handleImageUpload = async (image) => {
+        const storageRef = ref(storage, `images/${image.name}`);
+        await uploadBytes(storageRef, image);
+        const imageURL = await getDownloadURL(storageRef);
+        return imageURL;
+    };
+
+    const handleSubmit = async () => {
+        try {
+            const imageUrls = await Promise.all(images.map(image => handleImageUpload(image)));
+            await addDoc(collection(db, 'annunci'), {
+                title,
+                description,
+                location,
+                images: imageUrls,
+                userId: user.uid,
+                createdAt: new Date()
+            });
+            navigate('/home');
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
+    return (
+        <div className="container">
+            <h1>Posta un annuncio</h1>
+            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Titolo" />
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descrizione"></textarea>
+            <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Localizzazione" />
+            <input type="file" multiple onChange={(e) => setImages(Array.from(e.target.files))} />
+            <button onClick={handleSubmit}>Posta</button>
+        </div>
+    );
+};
+
+export default Posta;
